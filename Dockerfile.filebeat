@@ -1,12 +1,13 @@
-FROM docker.elastic.co/beats/filebeat:7.10.2
+# Newer versions of filebeat don't recognize OpenSearch.
+# We also need to use the OSS version, otherwise OpenSearch is still not recognized.
+FROM docker.elastic.co/beats/filebeat-oss:7.10.2
 
-# Set the working directory
 WORKDIR /usr/share/filebeat
 
-# Copy the configuration file into the container and set ownership and permissions
 COPY filebeat.yml /usr/share/filebeat/filebeat.yml
 USER root
+
+# If filebeat.yml isn't set to root, filebeat will complain at startup and exit.
 RUN chown root:root /usr/share/filebeat/filebeat.yml && chmod 600 /usr/share/filebeat/filebeat.yml
 
-# Start Filebeat
 ENTRYPOINT ["filebeat", "-e"]
