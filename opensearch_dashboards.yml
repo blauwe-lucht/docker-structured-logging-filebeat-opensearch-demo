@@ -1,0 +1,6 @@
+---
+# Custom opensearch_dashboards.yml to disable security, see
+# https://opensearch.org/docs/latest/security/configuration/disable-enable-security/
+server.name: opensearch-dashboards
+server.host: "0.0.0.0"
+opensearch.hosts: http://localhost:9200
