@@ -7,6 +7,7 @@ services:
       - discovery.type=single-node
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - plugins.security.disabled=true
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=T!mberW0lf#92"
     ulimits:
       memlock:
         soft: -1
@@ -31,20 +32,25 @@ services:
 
   # Log Generator Service
   loggenerator:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.loggenerator
     container_name: loggenerator
+    labels:
+      filebeat_log_gathering: enabled
     networks:
       - logging-net
 
   # Filebeat Service
   filebeat:
-    image: docker.elastic.co/beats/filebeat:8.9.0
+    build:
+      context: .
+      dockerfile: Dockerfile.filebeat
     container_name: filebeat
     user: root
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
     networks:
       - logging-net
     depends_on:

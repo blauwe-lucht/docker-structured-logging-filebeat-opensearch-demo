@@ -1,3 +1,7 @@
+# Temp
+logging.level: debug
+logging.selectors: ["*"]
+
 filebeat.inputs:
 - type: container
   paths:
@@ -6,9 +10,19 @@ filebeat.inputs:
   json.keys_under_root: true
   processors:
     - add_docker_metadata: ~
+    - rename:
+        fields:
+          - from: "@t"
+            to: "timestamp"
+          - from: "@mt"
+            to: "message"
+    - drop_event:
+        when:
+          not:
+            contains:
+              docker.container.labels.filebeat_log_gathering: enabled
 
-output.opensearch:
+output.elasticsearch:
   hosts: ["http://opensearch:9200"]
   username: "admin"
   password: "admin"
-  index: "docker-logs-%{+yyyy.MM.dd}"

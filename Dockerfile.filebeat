@@ -1,0 +1,12 @@
+FROM docker.elastic.co/beats/filebeat:8.9.0
+
+# Set the working directory
+WORKDIR /usr/share/filebeat
+
+# Copy the configuration file into the container and set ownership and permissions
+COPY filebeat.yml /usr/share/filebeat/filebeat.yml
+USER root
+RUN chown root:root /usr/share/filebeat/filebeat.yml && chmod 600 /usr/share/filebeat/filebeat.yml
+
+# Start Filebeat
+ENTRYPOINT ["filebeat", "-e"]
