@@ -1,48 +1,96 @@
+# Based on the recommended docker-compose.yml at
+# https://opensearch.org/docs/latest/install-and-configure/install-opensearch/docker/
+# A 2-node OpenSearch cluster with account admin/T!mberW0lf#92,
+# an OpenSearch Dashboards node,
+# a filebeat node
+# and a loggenerator node that generates logs using Serilog.
+# Not using latest tags for the OpenSearch images because at the moment
+# 2.16.0 does not load the Discover page on Firefox (no idea why), so we're using 2.15.0
+# which does work properly.
+
 services:
-  # OpenSearch Service
-  opensearch:
-    image: opensearchproject/opensearch:latest
-    container_name: opensearch
+  opensearch-node1: # This is also the hostname of the container within the Docker network (i.e. https://opensearch-node1/)
+    image: opensearchproject/opensearch:2.15.0 # Specifying the latest available image - modify if you want a specific version
+    container_name: opensearch-node1
     environment:
-      - discovery.type=single-node
-      - "OPENSEARCH_JAVA_OPTS=-Xms2048m -Xmx2048m"
-      - plugins.security.disabled=true
+      - cluster.name=opensearch-cluster # Name the cluster
+      - node.name=opensearch-node1 # Name the node that will run in this container
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2 # Nodes to look for when discovering the cluster
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 # Nodes eligible to serve as cluster manager
+      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set min and max JVM heap sizes to at least 50% of system RAM
       - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=T!mberW0lf#92"
+      # Make sure Filebeat 7.10.2 can talk to OpenSearch:
       - compatibility.override_main_response_version=true
     ulimits:
       memlock:
-        soft: -1
+        soft: -1 # Set memlock to unlimited (no soft or hard limit)
         hard: -1
+      nofile:
+        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        hard: 65536
     volumes:
-      - opensearch-data:/usr/share/opensearch/data
+      - opensearch-data1:/usr/share/opensearch/data # Creates volume called opensearch-data1 and mounts it to the container
     ports:
-      - "9200:9200"
+      - 9200:9200 # REST API
+      - 9600:9600 # Performance Analyzer
     networks:
       - logging-net
     healthcheck:
-      test: ["CMD", "curl", "-s", "-f", "http://localhost:9200"]
+      test: ["CMD", "curl", "-s", "-f", "-k", "https://localhost:9200", "-u", "admin:T!mberW0lf#92"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
 
-  # OpenSearch Dashboards Service
-  opensearch-dashboards:
-    build:
-      context: .
-      dockerfile: Dockerfile.opensearch-dashboards
-    container_name: opensearch-dashboards
+  opensearch-node2:
+    image: opensearchproject/opensearch:2.15.0 # This should be the same image used for opensearch-node1 to avoid issues
+    container_name: opensearch-node2
     environment:
-      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node2
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=T!mberW0lf#92"
+      # Make sure Filebeat 7.10.2 can talk to OpenSearch:
+      - compatibility.override_main_response_version=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data2:/usr/share/opensearch/data
+    networks:
+      - logging-net
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "-k", "https://localhost:9200", "-u", "admin:T!mberW0lf#92"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.15.0 # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
+    container_name: opensearch-dashboards
     ports:
-      - "5601:5601"
+      - 5601:5601 # Map host port 5601 to container port 5601
+    expose:
+      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+    environment:
+      OPENSEARCH_HOSTS: '["https://opensearch-node1:9200","https://opensearch-node2:9200"]' # Define the OpenSearch nodes that OpenSearch Dashboards will query
     networks:
       - logging-net
     depends_on:
-      opensearch:
+      opensearch-node1:
+        condition: service_healthy
+      opensearch-node2:
         condition: service_healthy
 
-  # Log Generator Service
   loggenerator:
     build:
       context: .
@@ -50,10 +98,15 @@ services:
     container_name: loggenerator
     labels:
       filebeat_log_gathering: enabled
+    # Limit generated logs to 1 MB:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
     networks:
       - logging-net
 
-  # Filebeat Service
   filebeat:
     build:
       context: .
@@ -66,12 +119,14 @@ services:
     networks:
       - logging-net
     depends_on:
-      opensearch:
+      opensearch-node1:
+        condition: service_healthy
+      opensearch-node2:
         condition: service_healthy
 
 networks:
   logging-net:
-    driver: bridge
 
 volumes:
-  opensearch-data:
+  opensearch-data1:
+  opensearch-data2:

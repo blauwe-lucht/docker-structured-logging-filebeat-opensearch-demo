@@ -1,28 +1,28 @@
 # Temp
-logging.level: debug
-logging.selectors: ["*"]
+#logging.level: debug
+#logging.selectors: ["*"]
 
-filebeat.inputs:
-- type: container
-  paths:
-    - /var/lib/docker/containers/*/*.log
-  json.message_key: log
-  json.keys_under_root: true
-  processors:
-    - add_docker_metadata: ~
-    - rename:
-        fields:
-          - from: "@t"
-            to: "timestamp"
-          - from: "@mt"
-            to: "message"
-    - drop_event:
-        when:
-          not:
-            contains:
-              docker.container.labels.filebeat_log_gathering: enabled
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
+      json.message_key: log  
+      templates:
+        - condition:
+            equals:
+              docker.container.labels.filebeat_log_gathering: "enabled"
+          config:
+            - type: docker
+              containers.ids:
+                - "${data.docker.container.id}"
+              json.keys_under_root: true
+              json.add_error_key: false
+
+processors:
+  - add_docker_metadata: ~
 
 output.elasticsearch:
-  hosts: ["http://opensearch:9200"]
+  hosts: ["https://opensearch-node1:9200", "https://opensearch-node2:9200"]
   username: "admin"
-  password: "admin"
+  password: "T!mberW0lf#92"
+  ssl.verification_mode: none
