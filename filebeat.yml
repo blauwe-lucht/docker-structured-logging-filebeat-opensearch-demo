@@ -1,12 +1,6 @@
-# Temp
-#logging.level: debug
-#logging.selectors: ["*"]
-
 filebeat.autodiscover:
   providers:
     - type: docker
-      hints.enabled: true
-      json.message_key: log  
       templates:
         - condition:
             equals:
@@ -15,6 +9,7 @@ filebeat.autodiscover:
             - type: docker
               containers.ids:
                 - "${data.docker.container.id}"
+              json.message_key: log
               json.keys_under_root: true
               json.add_error_key: false
 
