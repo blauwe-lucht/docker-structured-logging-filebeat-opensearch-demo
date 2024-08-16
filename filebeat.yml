@@ -12,9 +12,12 @@ filebeat.autodiscover:
               json.message_key: log
               json.keys_under_root: true
               json.add_error_key: false
-
-processors:
-  - add_docker_metadata: ~
+              processors:
+                - add_docker_metadata: ~
+                - timestamp:
+                    field: "@t"
+                    layouts:
+                      - "2024-08-16T14:02:59.7059876Z"
 
 output.elasticsearch:
   hosts: ["https://opensearch-node1:9200", "https://opensearch-node2:9200"]
