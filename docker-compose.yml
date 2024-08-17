@@ -65,6 +65,7 @@ services:
         hard: 65536
     volumes:
       - opensearch-data2:/usr/share/opensearch/data
+    # Don't add any ports, from the outside it's fine that we can only talk with node1.
     networks:
       - logging-net
     healthcheck:
@@ -90,6 +91,12 @@ services:
         condition: service_healthy
       opensearch-node2:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "-k", "http://localhost:5601/api/status", "-u", "admin:T!mberW0lf#92"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   loggenerator:
     build:
@@ -122,6 +129,8 @@ services:
       opensearch-node1:
         condition: service_healthy
       opensearch-node2:
+        condition: service_healthy
+      opensearch-dashboards:
         condition: service_healthy
 
 networks:
